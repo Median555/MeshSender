@@ -1,5 +1,5 @@
-﻿//Ascii-code look-up table
-static const byte ASCII[][5] =
+//Ascii-code look-up table
+static const int ASCII[][5] =
 {
  {0x00, 0x00, 0x00, 0x00, 0x00} // 20
 ,{0x00, 0x00, 0x5f, 0x00, 0x00} // 21 !
@@ -97,5 +97,95 @@ static const byte ASCII[][5] =
 ,{0x00, 0x41, 0x36, 0x08, 0x00} // 7d }
 ,{0x10, 0x08, 0x08, 0x10, 0x08} // 7e ←
 ,{0x00, 0x06, 0x09, 0x09, 0x06} // 7f →
-//niclas styrer!
 };
+
+//Write a string of characters to the display at (x, y)
+void DrawString(byte *buffer, char *characters, uint8_t x, uint8_t y) 
+{
+  char* startAdress = characters; //store the location of the beginning of the string
+  int xOffsetStart; 
+  int xOffset = xOffsetStart = (y / 8) * LCD_WIDTH; //the index in the buffer, offset from the x-cordinate
+  uint8_t yOffset = y % 8; //vertical offset on the line
+  
+  while(*characters) //until we reach the end of the characters
+  {
+      //write out each character
+      for(int i=0; i<5; i++)
+          buffer[x + xOffset++] |= (ASCII[*characters - 0x20][i]) << yOffset; //'add' the character, nudge it down
+      xOffset++; //make a space
+      *characters++;
+  }
+  
+  //reset to beginning
+  xOffset = xOffsetStart;
+  characters = startAdress;
+  while(*characters) //until we reach the end of the characters
+  {
+      //write out each character
+      for(int i=0; i<5; i++)
+          buffer[x + LCD_WIDTH + xOffset++] |= (ASCII[*characters - 0x20][i]) >> (8 - yOffset); //'add' the character, nudgde it the opposite way
+      xOffset++; //make a space
+      *characters++;
+  }
+  
+}
+
+void DrawClear(byte *buffer)
+{
+  for(int i = 0; i < LCD_WIDTH * LCD_HEIGHT / 8; i++)
+  {
+      buffer[i] = 0;
+  }
+}
+
+//draw buffer to display
+void LCDUpdate(byte *buffer)
+{
+  //set cursor to (0, 0)
+  LCDWriteCmd(0x20);
+  LCDWriteCmd(0x40);
+  LCDWriteCmd(0x80);
+  //send buffer to display
+  for (int i = 0; i < LCD_WIDTH * LCD_HEIGHT / 8; i++)
+  {
+   LCDWriteData(buffer[i]); 
+  }
+}
+
+
+//draw a single black point
+void DrawPoint(byte *buffer, int x, int y)
+{
+  if (x < 0 || x > LCD_WIDTH - 1) return;
+  if (y < 0 || y > LCD_HEIGHT - 1) return;
+  int i = x + (y/8)* LCD_WIDTH;
+  buffer[i] |= 1 << (y%8);
+}
+
+//@TODO: make this work :|
+void LCDLine(int x0, int y0, int x1, int y1)
+{
+  int dx = abs(x1 - x0);
+  int dy = abs(y1 - y0);
+  int sx = (x0 < x1)? 1 : -1;
+  int sy = (y0 < y1)? 1 : -1;
+  int err = dx - dy;
+  int e2;
+  
+  while(1)
+  {
+    //point(x0, y0);
+    if (x0 == x1 && y0 == y1) break;
+    e2 = 2 * err;
+    if (e2 > -dy)
+    {
+      err -= dy;
+      x0 += dx;
+    }
+    if (e2 < dx)
+    {
+      err += dx;
+      y0 += sy;
+    }
+  }
+}
