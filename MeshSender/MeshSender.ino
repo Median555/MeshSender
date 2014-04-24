@@ -14,15 +14,30 @@ void setup()
   while (!Serial) {;}
   Serial.println(String(getStatus(), BIN));
   
-  LCDInit();
   /*
+  LCDInit();
   DrawClear(vram);
   DrawString(vram, "Hej verden!", 10, 10);
   LCDUpdate(vram);*/
 }
 
+int last1 = 0;
+int last2 = 0;
+
 void loop() 
 {
+  
+  if (last1 != joystickSector(1))
+  {
+    last1 = joystickSector(1);
+    Serial.println(last1);
+  }
+  
+  if (last2 != joystickSector(2))
+  {
+    last2 = joystickSector(2);
+    Serial.println(last2);
+  }
   
   /*
   point(pointerX,pointerY); //opretter variabler for x og y koordinaterne til funktionen point

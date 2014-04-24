@@ -1,3 +1,11 @@
+//INPUT
+#define JOYSTICK_DEADZONE 150;
+#define JOYSTICK_1_X_PIN A6
+#define JOYSTICK_1_Y_PIN A7
+#define JOYSTICK_2_X_PIN A8
+#define JOYSTICK_2_Y_PIN A9
+
+//LCD
 #define LCD_RST 12
 #define LCD_SCE 11
 #define LCD_DC 10
