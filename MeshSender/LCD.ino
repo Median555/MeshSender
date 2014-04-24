@@ -15,7 +15,7 @@ void LCDInit()
   digitalWrite(LCD_RST, HIGH);
   
   LCDWriteCmd(0x21); //H = 1, skifter kommando-set til 1
-  LCDWriteCmd(0x9F); //sætter kontrast
+  LCDWriteCmd(0xB9); //sætter kontrast
   LCDWriteCmd(0x04); //sætter temperatur koefficient til 0 (don't touch)
   LCDWriteCmd(0x14); //sætter Bias voltage til 1:40, kan ændres
   LCDWriteCmd(0x20); //H = 0, skifter kommandoset til 0
