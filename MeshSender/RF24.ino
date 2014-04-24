@@ -1,10 +1,7 @@
-
-
-
 #include <SPI.h>
 
 const uint8_t RFcePin = 9, RFcsnPin = 10;
-
+const uint64_t commonAddress = 0xF0F0F0F042LL; //this address is common for all devices
 
 /*--------------------------------------------------------*/
 
@@ -61,6 +58,10 @@ void RFbegin()
   
   //set channel
   setChannel(42);
+  
+  
+  //open the reading pipes
+  
   
   //flush all
   flushRX();
@@ -177,3 +178,5 @@ uint8_t flushTX()
   
   return statusOut;
 }
+
+/*--------------------------------------------------------*/
