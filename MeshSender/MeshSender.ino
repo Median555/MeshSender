@@ -8,7 +8,7 @@ byte vram1[LCD_WIDTH * LCD_HEIGHT / 8]; //frambuffer nyt billede til display
 int pointerX;
 int pointerY;
 
-const String keyboardLayout[] = {"abcd", "efgh", "ijkl", "mnop", "qrst", "uvxy", "zæøå", ".,_!"};
+const String keyboardLayout[] = {"ijkl", "efgh", "abcd", ".,_!", "zæøå", "uvxy", "qrst", "mnop"};
 
 
 void setup() 
