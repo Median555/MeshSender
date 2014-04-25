@@ -127,7 +127,24 @@ void DrawString(byte *buffer, char *characters, uint8_t x, uint8_t y)
       xOffset++; //make a space
       *characters++;
   }
+}
+
+//Write a character to the display at (x, y)
+void DrawString(byte *buffer, char characters, uint8_t x, uint8_t y) 
+{
+  int xOffsetStart; 
+  int xOffset = xOffsetStart = (y / 8) * LCD_WIDTH; //the index in the buffer, offset from the x-cordinate
+  uint8_t yOffset = y % 8; //vertical offset on the line
   
+  //write out each character
+  for(int i=0; i<5; i++)
+      buffer[x + xOffset++] |= (ASCII[characters - 0x20][i]) << yOffset; //'add' the character, nudge it down
+  xOffset++; //make a space
+  xOffset = xOffsetStart;
+  //write out each character
+  for(int i=0; i<5; i++)
+      buffer[x + LCD_WIDTH + xOffset++] |= (ASCII[characters - 0x20][i]) >> (8 - yOffset); //'add' the character, nudgde it the opposite way
+  xOffset++; //make a space
 }
 
 void DrawClear(byte *buffer)
@@ -152,6 +169,13 @@ void LCDUpdate(byte *buffer)
   }
 }
 
+void DrawKeyboard(byte *buffer, String keys, int x, int y)
+{
+      DrawString(buffer, keys.charAt(1), x + 3, y - 4);
+      DrawString(buffer, keys.charAt(3), x - 9, y - 4);
+      DrawString(buffer, keys.charAt(0), x - 3, y - 8);
+      DrawString(buffer, keys.charAt(2), x - 3, y - 1);
+}
 
 //draw a single black point
 void DrawPoint(byte *buffer, int x, int y)

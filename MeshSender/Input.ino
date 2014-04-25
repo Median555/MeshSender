@@ -34,8 +34,8 @@ uint8_t joystickSector(uint8_t joystickNumber)
       return -1;
     
     //rotate vector input 22.5 degrees
-    float xtemp = x * cos(-PI/8) - y * sin(PI/8);
-    float ytemp = x * sin(-PI/8) + y * cos(PI/8);
+    float xtemp = x * cos(PI/2) - y * sin(PI/2);
+    float ytemp = x * sin(PI/2) + y * cos(PI/2);
     x = xtemp;
     y = ytemp;
     
@@ -63,8 +63,8 @@ uint8_t joystickSector(uint8_t joystickNumber)
       return -1;
     
     //rotate vector input 22.5 degrees
-    float xtemp = x * cos(-PI/8) - y * sin(PI/8);
-    float ytemp = x * sin(-PI/8) + y * cos(PI/8);
+    float xtemp = x * cos(PI/2) - y * sin(PI/2);
+    float ytemp = x * sin(PI/2) + y * cos(PI/2);
     x = xtemp;
     y = ytemp;
     
