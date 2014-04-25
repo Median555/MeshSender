@@ -1,20 +1,22 @@
 
 #include <math.h>
-
 float J1Xmin = 512 - 0.5 * JOYSTICK_DEADZONE; //joystick 1, x-axis minimum
-float J1Xmax = 512 + 0.5 * JOYSTICK_DEADZONE; 
-float J1Ymin = 512 - 0.5 * JOYSTICK_DEADZONE;
-float J1Ymax = 512 + 0.5 * JOYSTICK_DEADZONE;
+float J1Xmax = 512 + 0.5 * JOYSTICK_DEADZONE; //joystick 1, x-axis maximum
+float J1Ymin = 512 - 0.5 * JOYSTICK_DEADZONE; //joystick 1, y-axis minimum
+float J1Ymax = 512 + 0.5 * JOYSTICK_DEADZONE; //joystick 1, y-axis maximum
 float J2Xmin = 512 - 0.5 * JOYSTICK_DEADZONE; //joystick 2, x-axis minimum
-float J2Xmax = 512 + 0.5 * JOYSTICK_DEADZONE; 
-float J2Ymin = 512 - 0.5 * JOYSTICK_DEADZONE;
-float J2Ymax = 512 + 0.5 * JOYSTICK_DEADZONE;
+float J2Xmax = 512 + 0.5 * JOYSTICK_DEADZONE; //joystick 2, x-axis maximum
+float J2Ymin = 512 - 0.5 * JOYSTICK_DEADZONE; //joystick 2, y-axis minimum
+float J2Ymax = 512 + 0.5 * JOYSTICK_DEADZONE; //joystick 2, y-axis maximum
+
 
 //joystickNumber is the joystick we wan't to check
-uint8_t joystickSector(uint8_t joystickNumber)
+//Method can give us number of section for Joystick 1 or 2
+//by knowing angles we can turn it into sections
+int joystickSector(uint8_t joystickNumber, uint8_t sectorCount)
 {
   float xin, yin;
-  float x, y, angle;
+  float x, y, angle, rotation = - PI / sectorCount; 
   const int deadzone = JOYSTICK_DEADZONE;
   
   if (joystickNumber == 1)
@@ -34,8 +36,8 @@ uint8_t joystickSector(uint8_t joystickNumber)
       return -1;
     
     //rotate vector input 22.5 degrees
-    float xtemp = x * cos(PI/2) - y * sin(PI/2);
-    float ytemp = x * sin(PI/2) + y * cos(PI/2);
+    float xtemp = x * cos(rotation) - y * sin(rotation);
+    float ytemp = x * sin(rotation) + y * cos(rotation);
     x = xtemp;
     y = ytemp;
     
@@ -43,7 +45,7 @@ uint8_t joystickSector(uint8_t joystickNumber)
     angle *= 180/PI; //convert to degress
     angle = (angle * -1) + 180;
     
-    return ((int)angle) / 45;
+    return ((int)angle) / (360 / sectorCount);
   }
   
   if (joystickNumber == 2)
@@ -63,8 +65,8 @@ uint8_t joystickSector(uint8_t joystickNumber)
       return -1;
     
     //rotate vector input 22.5 degrees
-    float xtemp = x * cos(PI/2) - y * sin(PI/2);
-    float ytemp = x * sin(PI/2) + y * cos(PI/2);
+    float xtemp = x * cos(rotation) - y * sin(rotation);
+    float ytemp = x * sin(rotation) + y * cos(rotation);
     x = xtemp;
     y = ytemp;
     
@@ -72,7 +74,7 @@ uint8_t joystickSector(uint8_t joystickNumber)
     angle *= 180/PI; //convert to degress
     angle = (angle * -1) + 180;
     
-    return ((int)angle) / 45;
+    return ((int)angle) / (360 / sectorCount);
   }
   
   return -1;

@@ -8,8 +8,12 @@ byte vram1[LCD_WIDTH * LCD_HEIGHT / 8]; //frambuffer nyt billede til display
 int pointerX;
 int pointerY;
 
-const String keyboardLayout[] = {"ijkl", "efgh", "abcd", ".,_!", "zæøå", "uvxy", "qrst", "mnop"};
+unsigned long lastKeyboardInputTime = millis();
+char lastKeyboardInput = -1;
 
+const String keyboardLayout[] = {"ijkl", "efgh", "abcd", "., !", "zæøå", "uvxy", "qrst", "mnop"};
+String text = "";
+//const String keyboardChar[] = {"abcdefghijklmnopqrstuvxyzæøå"};
 
 void setup() 
 {
@@ -44,7 +48,7 @@ void loop()
     last2 = joystickSector(2);
     Serial.println(last2);
   }
-  //Joystick 1 drawing points in Section
+  //Joystick 1 drawing points in Section - Game Snake
   int sector = joystickSector(1);
    
   if (sector == 0 || sector == 1 || sector == 7) pointerX++;
@@ -57,9 +61,36 @@ void loop()
   //Joystick 1 draw keyboard if you go direction x*/
   
   
-  int sector = joystickSector(1);
+  int sector = joystickSector(1, 8);
   DrawClear(vram);
   if (sector >= 0 && sector < 8) DrawKeyboard(vram, keyboardLayout[sector], LCD_WIDTH/2, LCD_HEIGHT/2);
+  
+  if (sector != -1)
+  {
+    int sector2 = joystickSector(2, 4);
+    if (sector2 != -1)
+    {
+      char keyboardInput = keyboardLayout[sector].charAt(sector2);
+      if (millis() > lastKeyboardInputTime + ((lastKeyboardInput == keyboardInput)?400:10) )
+      {
+        text += keyboardInput;
+        lastKeyboardInput = keyboardInput;
+        lastKeyboardInputTime = millis();
+        DrawClear(vram1);
+        char charBuffer[50];
+        text.toCharArray(charBuffer, 50);
+        DrawString(vram1, charBuffer, 0, 0);
+        Serial.println(text);
+        Serial.println();
+      }
+      //DrawKeyboard(vram1, keyboardChar[sector2],0,0);*/
+    }
+    else
+    {
+      lastKeyboardInput = -1;
+    }
+  }
+  
   
   LCDUpdate(vram);
   
