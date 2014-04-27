@@ -14,8 +14,9 @@ void setup()
   while (!Serial) {;}
   Serial.println(String(getStatus(), BIN));
   
-  LCDInit();
   /*
+  LCDInit();
+  
   DrawClear(vram);
   DrawString(vram, "Hej verden!", 10, 10);
   LCDUpdate(vram);*/
