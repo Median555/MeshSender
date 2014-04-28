@@ -11,7 +11,7 @@ int pointerY;
 unsigned long lastKeyboardInputTime = millis();
 char lastKeyboardInput = -1;
 
-const String keyboardLayout[] = {"ijkl", "efgh", "abcd", "., !", "zæøå", "uvxy", "qrst", "mnop"};
+const String keyboardLayout[] = {"ijkl", "qrst" , "mnop", "efgh", "abcd", "., !", "zæøå","uvxy"};  //Small letters
 String text = "";
 //const String keyboardChar[] = {"abcdefghijklmnopqrstuvxyzæøå"};
 
@@ -36,7 +36,7 @@ int last2 = 0;
 
 void loop() 
 {
-    /*
+    /* Snake
   if (last1 != joystickSector(1))
   {
     last1 = joystickSector(1);
@@ -60,10 +60,11 @@ void loop()
   DrawPoint(vram, pointerX, pointerY);
   //Joystick 1 draw keyboard if you go direction x*/
   
-  
-  int sector = joystickSector(1, 8);
+  byte vram2[LCD_WIDTH * LCD_HEIGHT / 8];
+  DrawClear(vram2);
+  int sector = joystickSector(1, 8); //Make the variable sector = JoystickSector and as parameter choose joystick 1 and splits it up in 8 sections.
   DrawClear(vram);
-  if (sector >= 0 && sector < 8) DrawKeyboard(vram, keyboardLayout[sector], LCD_WIDTH/2, LCD_HEIGHT/2);
+  if (sector >= 0 && sector < 8) DrawKeyboard(vram, keyboardLayout[sector], LCD_WIDTH/2, LCD_HEIGHT/2); //Draw the string keyboardlayout on the buffer vram, on in the middle.
   
   if (sector != -1)
   {
@@ -76,23 +77,26 @@ void loop()
         text += keyboardInput;
         lastKeyboardInput = keyboardInput;
         lastKeyboardInputTime = millis();
+        //DrawClear(vram1);
+        char charBuffer[86];
+        text.toCharArray(charBuffer, 86);
+        
         DrawClear(vram1);
-        char charBuffer[50];
-        text.toCharArray(charBuffer, 50);
         DrawString(vram1, charBuffer, 0, 0);
-        Serial.println(text);
-        Serial.println();
+        //Serial.println(text);
       }
-      //DrawKeyboard(vram1, keyboardChar[sector2],0,0);*/
-    }
-    else
-    {
-      lastKeyboardInput = -1;
+      //DrawKeyboard(vram1, keyboardChar[sector2],0,0);
     }
   }
   
-  
-  LCDUpdate(vram);
+    else
+    {
+      lastKeyboardInput = -1;
+ }
+
+
+  mergeBuffers(vram2, vram, vram1, LCD_WIDTH * LCD_HEIGHT / 8);
+  LCDUpdate(vram2);
   
   //delay(50);
-}
+  }

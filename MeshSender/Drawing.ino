@@ -147,6 +147,7 @@ void DrawString(byte *buffer, char characters, uint8_t x, uint8_t y)
   xOffset++; //make a space
 }
 
+// Clears our screen
 void DrawClear(byte *buffer)
 {
   for(int i = 0; i < LCD_WIDTH * LCD_HEIGHT / 8; i++)
@@ -169,12 +170,13 @@ void LCDUpdate(byte *buffer)
   }
 }
 
+//Draw Characters in our buffer on the x,y's place
 void DrawKeyboard(byte *buffer, String keys, int x, int y)
 {
-      DrawString(buffer, keys.charAt(1), x + 3, y - 4);
-      DrawString(buffer, keys.charAt(3), x - 9, y - 4);
-      DrawString(buffer, keys.charAt(0), x - 3, y - 8);
-      DrawString(buffer, keys.charAt(2), x - 3, y - 1);
+      DrawString(buffer, keys.charAt(1), x + 3, y - 4);  //The string is drawn on the buffer, draw the string keys.CharAt(1), in the middle on east position.
+      DrawString(buffer, keys.charAt(3), x - 9, y - 4);  //The string is drawn on the buffer, draw the string keys.CharAt(3), in the middle on west position.
+      DrawString(buffer, keys.charAt(0), x - 3, y - 8);  //The string is drawn on the buffer, draw the string keys.CharAt(1), in the middle on north position.
+      DrawString(buffer, keys.charAt(2), x - 3, y - 1);  //The string is drawn on the buffer, draw the string keys.CharAt(1), in the middle on south position.
 }
 
 //draw a single black point
@@ -211,5 +213,16 @@ void LCDLine(int x0, int y0, int x1, int y1)
       err += dx;
       y0 += sy;
     }
+  }
+}
+
+void mergeBuffers(byte *destination, byte *part1, byte *part2, int length)
+{
+  while(length--)
+  { 
+    *destination = *part1 | *part2;
+    destination++;
+    part1++;
+    part2++;
   }
 }
