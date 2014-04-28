@@ -1,8 +1,7 @@
 //initialize LCD display
 void LCDInit()
 {
-  // "Her sætter vi alle pins vi skal bruge på vores Teensy 3.1 til
-  // output istedet for input som de er fra standard.
+  // Sets all the pins to the display to output
   pinMode(LCD_RST, OUTPUT);
   pinMode(LCD_SCE, OUTPUT);
   pinMode(LCD_DC, OUTPUT);
