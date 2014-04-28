@@ -7,60 +7,50 @@ int Xakse = 0;
 int pointerX;
 int pointerY;
 
+const boolean isSender = false;
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
+
 void setup() 
 {
   
   Serial.begin(9600);
-  //while (!Serial) {;}
-  //Serial.println(String(getStatus(), BIN));
+  while (!Serial) {;}
+  delay(1000);
   RFbegin();
-  /*
-  LCDInit();
   
-  DrawClear(vram);
-  DrawString(vram, "Hej verden!", 10, 10);
-  LCDUpdate(vram);*/
+  if (isSender)
+  {
+    openWritingPipe(pipes[0]);
+    openReadingPipe(1, pipes[1]);
+  }
+  else
+  {
+    openWritingPipe(pipes[1]);
+    openReadingPipe(1, pipes[0]);
+  }
+  
+  startListening();
 }
 
 void loop() 
 {
-  //Serial.println(String(getStatus(), BIN));
-  Serial.println("Hej");
-  delay(1000);
-  /*
-  point(pointerX,pointerY); //opretter variabler for x og y koordinaterne til funktionen point
-  
-  Yakse = analogRead(A9);  // Reads the analog inputs value on pin A9 in volt and converts it to digital.
-  Xakse = analogRead(A8);
-    if(Yakse>700){
-      int sensorValue = analogRead (A8);
-    float voltage = sensorValue * (5.0 / 1023.0);
-      Serial.print("Spaening:");
-      Serial.println(voltage,DEC);
+  if (isSender)
+  {
+    stopListening();
+    Serial.println(String(getStatus(), BIN));
+    Serial.println(String(readRegister(RF24_OBSERVE_TX), BIN));
+    
+    uint8_t num = 0x42;
+    sendTransmission(&num, sizeof(uint8_t));
+    
+    delay(1000);
+  }
+  else
+  {
+    if (RFAvailable())
+    {
+      Serial.println("Recieved something!");
+      delay(100);
     }
-     if(Yakse>750){
-      point(pointerX,pointerY--); // Decrease pointerY with 1 when Yakse> 750
-    }
-    if(Yakse<250){
-      point(pointerX,pointerY++); // Increase pointerY with 1 when Yakse < 250
-    }
-    if(Xakse>700){
-      point(pointerX++,pointerY); // Increase pointerX with 1 when Xakse > 800
-    }
-    if(Xakse<250){
-    point(pointerX--,pointerY);  // Decreases pointerX with 1 when Xakse < 250
-    }
-    if(Yakse > 700 && Xakse > 700) {
-      point(pointerX++,pointerY--);
-    }
-    if(Yakse > 660 && Xakse > 210) {
-      point(pointerX--,pointerY--);
-    }
-    if(Yakse < 250 && Xakse < 250) {
-      point(pointerX--,pointerY++);
-    }
-    if(Yakse < 250 && Xakse > 700) {
-      point(pointerX++,pointerY--);
-    }
-  delay(25);*/
+  }
 }

@@ -1,6 +1,7 @@
 #include <SPI.h>
 
 const uint8_t RFcePin = 9, RFcsnPin = 10;
+
 const uint64_t commonAddress = 0xF0F0F0F042LL; //this address is common for all devices
 
 /*--------------------------------------------------------*/
@@ -59,26 +60,45 @@ void RFbegin()
   //set channel
   setChannel(42);
   
-  
-  //open the reading pipes
-  writeRegister(RF24_RX_ADDR_P0, reinterpret_cast<uint8_t*>(commonAddress), 5); //write common address to RX pipe 0
-  //writeRegister(RF24_RX_ADDR_P1, reinterpret_cast<uint8_t*>(0xF042CC1337LL), 5); //write own addres to RX pipe 1
-  
-  writeRegister(RF24_RX_PW_P0, 32); //write static payload length to pipe0
-  
-  uint8_t previous = readRegister(RF24_EN_RXADDR);
-  writeRegister(RF24_EN_RXADDR, previous | (1 << 0)); //enable the reading pipes
-  
-  
-  //open writing pipe
-  writeRegister(RF24_TX_ADDR, reinterpret_cast<uint8_t*>(commonAddress), 5);
-  
-  
   //flush all
   flushRX();
   flushTX();
 }
 
+/*--------------------------------------------------------*/
+
+void openReadingPipe(uint8_t child, const uint64_t address )
+{
+  //open the reading pipes
+  uint8_t temp[5];
+  for(int i = 0; i < 5; i++) temp[i] = 0xF & (address >> (i * 8));
+  child = min(5, child);
+  writeRegister(child + 0xA, temp, (child <= 1)?5:1);
+  
+  //uint8_t temp[] = {0xF0, 0xF0, 0xF0, 0xF0, 0x42};
+  //writeRegister(RF24_RX_ADDR_P0, temp, 5);
+  //writeRegister(RF24_RX_ADDR_P0, reinterpret_cast<uint8_t*>(commonAddress), 5); //write common address to RX pipe 0
+  //writeRegister(RF24_RX_ADDR_P1, reinterpret_cast<uint8_t*>(0xF042CC1337LL), 5); //write own addres to RX pipe 1
+  
+  writeRegister(child + 0x11, 32); //write static payload length to pipe0
+  
+  uint8_t previous = readRegister(RF24_EN_RXADDR);
+  writeRegister(RF24_EN_RXADDR, previous | (1 << child)); //enable the reading pipes
+}
+ /*--------------------------------------------------------*/
+ 
+ void openWritingPipe(uint64_t address)
+ {
+  //open writing pipe
+  uint8_t temp[5];
+  for(int i = 0; i < 5; i++) temp[i] = 0xF & (address >> (i * 8));
+  writeRegister(RF24_RX_ADDR_P0, temp, 5);
+  writeRegister(RF24_TX_ADDR, temp, 5);
+  
+  writeRegister(RF24_RX_PW_P0, 32);
+  //writeRegister(RF24_TX_ADDR, reinterpret_cast<uint8_t*>(commonAddress), 5);
+ }
+ 
 /*--------------------------------------------------------*/
 
 void setChannel(uint8_t newChannel)
@@ -130,8 +150,12 @@ uint8_t writeRegister(uint8_t reg, uint8_t * buffer, uint8_t length)
   
   csn(LOW);
   statusOut = SPI.transfer(RF24_W_REGISTER | (RF24_REGISTER_MASK | reg));
+  Serial.println("Start SPI: " + String(RF24_W_REGISTER | (RF24_REGISTER_MASK | reg), HEX));
   while(length--) //for the length of the buffer
+  {
+    Serial.println(*buffer, HEX);
     SPI.transfer(*buffer++); //write the pointed @ value and increment
+  }
   csn(HIGH);
   
   return statusOut;
@@ -224,7 +248,7 @@ void stopListening()
 
 /*--------------------------------------------------------*/
 
-uint8_t sendTrasmission(const void *buffer, uint8_t length)
+uint8_t sendTransmission(const void *buffer, uint8_t length)
 {
   uint8_t statusOut;
   
@@ -255,3 +279,80 @@ uint8_t sendTrasmission(const void *buffer, uint8_t length)
 }
 
 /*--------------------------------------------------------*/
+
+boolean RFAvailable()
+{
+  uint8_t currentStatus = getStatus();
+  
+  boolean result = currentStatus & (1 << RF24_RX_DR); //is anything recieved
+  
+  writeRegister(RF24_STATUS, 1 << RF24_RX_DR); //clear the flag
+  
+  return result;
+}
+
+/*--------------------------------------------------------*/
+
+bool RFwrite( const void* buf, uint8_t len )
+{
+  bool result = false;
+
+  // Begin the write
+  startTransmission(buf, len);
+
+  // ------------
+  // At this point we could return from a non-blocking write, and then call
+  // the rest after an interrupt
+
+  // Instead, we are going to block here until we get TX_DS (transmission completed and ack'd)
+  // or MAX_RT (maximum retries, transmission failed).  Also, we'll timeout in case the radio
+  // is flaky and we get neither.
+
+  // IN the end, the send should be blocking.  It comes back in 60ms worst case, or much faster
+  // if I tighted up the retry logic.  (Default settings will be 1500us.
+  // Monitor the send
+  uint8_t observe_tx;
+  uint8_t status;
+  uint32_t sent_at = millis();
+  const uint32_t timeout = 500; //ms to wait for timeout
+  do
+  {
+    status = readRegister(RF24_OBSERVE_TX, &observe_tx, 1);
+  }
+  while( ! ( status & ( (1 << TX_DS) | (1 << MAX_RT) ) ) && ( millis() - sent_at < timeout ) );
+
+  // The part above is what you could recreate with your own interrupt handler,
+  // and then call this when you got an interrupt
+  // ------------
+
+  // Call this when you get an interrupt
+  // The status tells us three things
+  // * The send was successful (TX_DS)
+  // * The send failed, too many retries (MAX_RT)
+  // * There is an ack packet waiting (RX_DR)
+  bool tx_ok, tx_fail;
+  whatHappened(tx_ok,tx_fail,ack_payload_available);
+  
+  //printf("%u%u%u\r\n",tx_ok,tx_fail,ack_payload_available);
+
+  result = tx_ok;
+  IF_SERIAL_DEBUG(Serial.print(result?"...OK.":"...Failed"));
+
+  // Handle the ack packet
+  if ( ack_payload_available )
+  {
+    ack_payload_length = getDynamicPayloadSize();
+    IF_SERIAL_DEBUG(Serial.print("[AckPacket]/"));
+    IF_SERIAL_DEBUG(Serial.println(ack_payload_length,DEC));
+  }
+
+  // Yay, we are done.
+
+  // Power down
+  powerDown();
+
+  // Flush buffers (Is this a relic of past experimentation, and not needed anymore??)
+  flush_tx();
+
+  return result;
+}*/
