@@ -1,30 +1,47 @@
 
 #include "definitions.h"
 
+
 int Yakse = 0;
 int Xakse = 0;
-//byte vram[LCD_WIDTH * LCD_HEIGHT / 8]; //frambuffer for the LCD display
+byte vram[LCD_WIDTH * LCD_HEIGHT / 8]; //frambuffer for the LCD display
 int pointerX;
 int pointerY;
 
+  
+
 void setup() 
 {
-  RFbegin();
+ /* RFbegin();
   Serial.begin(9600);
   while (!Serial) {;}
-  Serial.println(String(getStatus(), BIN));
+  Serial.println(String(getStatus(), BIN)); 
+  */
+  setSyncProvider(getTeensy3Time);
   
-  /*
+  
   LCDInit();
   
-  DrawClear(vram);
-  DrawString(vram, "Hej verden!", 10, 10);
-  LCDUpdate(vram);*/
+  
+  //DrawClear(vram);
+  //DrawString(vram, "Hej verden!", 10, 10);
+  //LCDUpdate(vram);
 }
 
 void loop() 
 {
-  
+  if (Serial.available()) 
+  {
+    time_t t = processSyncMessage();
+    if (t != 0) 
+    {
+      Teensy3Clock.set(t); // set the RTC
+      setTime(t);
+    }
+  }
+  digitalClockDisplay();  
+  delay(1000);
+
   /*
   point(pointerX,pointerY); //opretter variabler for x og y koordinaterne til funktionen point
   
