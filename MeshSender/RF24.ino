@@ -61,6 +61,17 @@ void RFbegin()
   
   
   //open the reading pipes
+  writeRegister(RF24_RX_ADDR_P0, reinterpret_cast<uint8_t*>(commonAddress), 5); //write common address to RX pipe 0
+  //writeRegister(RF24_RX_ADDR_P1, reinterpret_cast<uint8_t*>(0xF042CC1337LL), 5); //write own addres to RX pipe 1
+  
+  writeRegister(RF24_RX_PW_P0, 32); //write static payload length to pipe0
+  
+  uint8_t previous = readRegister(RF24_EN_RXADDR);
+  writeRegister(RF24_EN_RXADDR, previous | (1 << 0)); //enable the reading pipes
+  
+  
+  //open writing pipe
+  writeRegister(RF24_TX_ADDR, reinterpret_cast<uint8_t*>(commonAddress), 5);
   
   
   //flush all
@@ -175,6 +186,70 @@ uint8_t flushTX()
   csn(LOW);
   statusOut = SPI.transfer(RF24_FLUSH_TX);
   csn(HIGH);
+  
+  return statusOut;
+}
+
+/*--------------------------------------------------------*/
+
+void startListening()
+{
+  //power up, set as PRX
+  uint8_t currentConfig = readRegister(RF24_CONFIG);
+  currentConfig |= (1 << RF24_PWR_UP) | (1 << RF24_PRIM_RX);
+  writeRegister(RF24_CONFIG, currentConfig);
+  
+  //clear interrupt flags
+  writeRegister(RF24_STATUS, (1 << RF24_RX_DR) | (1 << RF24_TX_DS) | (1 << RF24_MAX_RT));
+  
+  //flush buffers
+  flushRX();
+  flushTX();
+  
+  //activate radio
+  ce(HIGH);
+  
+  //wait for RX settle
+  delayMicroseconds(130);
+}
+
+/*--------------------------------------------------------*/
+
+void stopListening()
+{
+  ce(LOW);
+  flushRX();
+  flushTX();
+}
+
+/*--------------------------------------------------------*/
+
+uint8_t sendTrasmission(const void *buffer, uint8_t length)
+{
+  uint8_t statusOut;
+  
+  //switch to transmitter
+  uint8_t currentConfig = readRegister(RF24_CONFIG);
+  currentConfig |= (1 << RF24_PWR_UP);
+  currentConfig &= ~(1 << RF24_PRIM_RX);
+  writeRegister(RF24_CONFIG, currentConfig);
+  
+  //TX settle
+  delayMicroseconds(150);
+  
+  //write payload
+  const uint8_t *payload = reinterpret_cast<const uint8_t*>(buffer);
+  uint8_t blank_amount = 32 - length;
+  csn(LOW);
+  statusOut = SPI.transfer(RF24_W_TX_PAYLOAD); //write payload command
+  while(length--) SPI.transfer(*payload++); //transfer payload
+  while(blank_amount--) SPI.transfer(0);
+  csn(HIGH);
+  
+  //activate radio, send message
+  ce(HIGH);
+  delayMicroseconds(15);
+  ce(LOW);
   
   return statusOut;
 }

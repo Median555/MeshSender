@@ -9,13 +9,14 @@ int pointerY;
 
 void setup() 
 {
-  RFbegin();
-  Serial.begin(9600);
-  while (!Serial) {;}
-  Serial.println(String(getStatus(), BIN));
   
-  LCDInit();
+  Serial.begin(9600);
+  //while (!Serial) {;}
+  //Serial.println(String(getStatus(), BIN));
+  RFbegin();
   /*
+  LCDInit();
+  
   DrawClear(vram);
   DrawString(vram, "Hej verden!", 10, 10);
   LCDUpdate(vram);*/
@@ -23,7 +24,9 @@ void setup()
 
 void loop() 
 {
-  
+  //Serial.println(String(getStatus(), BIN));
+  Serial.println("Hej");
+  delay(1000);
   /*
   point(pointerX,pointerY); //opretter variabler for x og y koordinaterne til funktionen point
   
