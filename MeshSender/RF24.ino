@@ -219,28 +219,27 @@ boolean RFsetRF(uint8_t data_rate, uint8_t power)
 
 boolean RFpowerDown()
 {
-    RFspiWriteRegister(NRF24_REG_00_CONFIG, RFcurrentConfiguration);
+    RFspiWriteRegister(NRF24_REG_00_CONFIG, RFcurrentConfiguration & ~(NRF24_PWR_UP));
     digitalWrite(RFcePin, LOW);
     return true;
 }
-
 /**************************************************************************/
 
 boolean RFpowerUpRX()
 {
     boolean status = RFspiWriteRegister(NRF24_REG_00_CONFIG, RFcurrentConfiguration | NRF24_PWR_UP | NRF24_PRIM_RX);
     digitalWrite(RFcePin, HIGH);
-    delayMicroseconds(150);
+    delayMicroseconds(130);
     return status;
 }
 
 /**************************************************************************/
 
-boolean RFpowerUpTx()
+boolean RFpowerUpTX()
 {
     // Its the pulse high that puts us into TX mode
     digitalWrite(RFcePin, LOW);
-    boolean status = RFspiWriteRegister(NRF24_REG_00_CONFIG, RFcurrentConfiguration | NRF24_PWR_UP);
+    boolean status = RFspiWriteRegister(NRF24_REG_00_CONFIG, (RFcurrentConfiguration | NRF24_PWR_UP) & ~(NRF24_PRIM_RX) );
     digitalWrite(RFcePin, HIGH);
     return status;
 }
@@ -249,7 +248,7 @@ boolean RFpowerUpTx()
 
 boolean RFsend(uint8_t* data, uint8_t len, boolean noack)
 {
-    RFpowerUpTx();
+    RFpowerUpTX();
     RFspiBurstWrite(noack ? NRF24_COMMAND_W_TX_PAYLOAD_NOACK : NRF24_COMMAND_W_TX_PAYLOAD, data, len);
     // Radio will return to Standby II mode after transmission is complete
     return true;
