@@ -1,358 +1,359 @@
 #include <SPI.h>
 
 const uint8_t RFcePin = 9, RFcsnPin = 10;
+uint8_t RFcurrentConfiguration = NRF24_EN_CRC | NRF24_CRCO;
 
 const uint64_t commonAddress = 0xF0F0F0F042LL; //this address is common for all devices
 
-/*--------------------------------------------------------*/
 
-void ce(uint8_t state)
+/**************************************************************************/
+
+boolean RFinit()
 {
-  digitalWrite(RFcePin, state);
-}
-
-void csn(uint8_t state)
-{
-  SPI.setBitOrder(MSBFIRST);
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setClockDivider(SPI_CLOCK_DIV4);
-  
-  digitalWrite(RFcsnPin, state);
-}
-
-/*--------------------------------------------------------*/
-
-void RFbegin()
-{
+  //init udgangs porte
   pinMode(RFcePin, OUTPUT);
+  digitalWrite(RFcePin, LOW); //enable chip
   pinMode(RFcsnPin, OUTPUT);
+  digitalWrite(RFcsnPin, HIGH); //suspend the radio
   
+  pinMode(SCK, OUTPUT);
+  pinMode(MOSI, OUTPUT);
+  
+  delay(100); //wait for NRF24
+  
+  //initialize SPI
   SPI.begin();
+  SPI.setDataMode(SPI_MODE0);
+  SPI.setBitOrder(MSBFIRST);
+  SPI.setClockDivider(SPI_CLOCK_DIV16); //slow enough
   
-  ce(LOW); //enable the chip @TODO: can be removed?
-  csn(HIGH); //always enable the SPI interface
+  //clear flags
+  if (!RFspiWriteRegister(NRF24_REG_07_STATUS, NRF24_RX_DR | NRF24_TX_DS | NRF24_MAX_RT))
+    return false; //return faliure
   
-  delay(5); //let the radio settle
+  RFpowerDown();
   
-  //ARD: set Auto-retransmit delay to 2 ms
-  //ARC: set Auto-retransmit count to max of 15
-  writeRegister(RF24_SETUP_RETR, (B0110 << RF24_ARD) | (B1111 << RF24_ARC));
+  RFflushTX();
+  RFflushRX();
   
-  //set PA level to 0 dBm and data rate to 1 Mbps
-  uint8_t RFSetup = readRegister((uint8_t)RF24_RF_SETUP); //get the current setup
-  RFSetup &= ~(1 << 3); //RF_DR = 1 Mbps
-  RFSetup |= (1 << 1) | (1 << 2); //RF_PWR = 0 dBm
-  writeRegister(RF24_RF_SETUP, RFSetup); //write the register back
-  
-  //enable CRC and set CRCO = 2 bytes
-  uint8_t currentConfig = readRegister(RF24_CONFIG);
-  currentConfig |= 1 << 3; //EN_CRC = 1
-  currentConfig |= 1 << 2; //CRCO = 2 bytes
-  writeRegister(RF24_CONFIG, currentConfig);
-  
-  //disable dynamic payload for all pipes
-  writeRegister(RF24_DYNPD, 0);
-  
-  //clear status register
-  writeRegister(RF24_STATUS, 0x70);
-  //0x70 = (1 << RX_DR) | (1 << TX_DS) | (1 << MAX_RT)
-  
-  //set channel
-  setChannel(42);
-  
-  //flush all
-  flushRX();
-  flushTX();
+  return RFpowerUpRX();
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-void openReadingPipe(uint8_t child, const uint64_t address )
+uint8_t RFspiCommand(uint8_t command)
 {
-  //open the reading pipes
-  uint8_t temp[5];
-  for(int i = 0; i < 5; i++) temp[i] = 0xF & (address >> (i * 8));
-  child = min(5, child);
-  writeRegister(child + 0xA, temp, (child <= 1)?5:1);
-  
-  //uint8_t temp[] = {0xF0, 0xF0, 0xF0, 0xF0, 0x42};
-  //writeRegister(RF24_RX_ADDR_P0, temp, 5);
-  //writeRegister(RF24_RX_ADDR_P0, reinterpret_cast<uint8_t*>(commonAddress), 5); //write common address to RX pipe 0
-  //writeRegister(RF24_RX_ADDR_P1, reinterpret_cast<uint8_t*>(0xF042CC1337LL), 5); //write own addres to RX pipe 1
-  
-  writeRegister(child + 0x11, 32); //write static payload length to pipe0
-  
-  uint8_t previous = readRegister(RF24_EN_RXADDR);
-  writeRegister(RF24_EN_RXADDR, previous | (1 << child)); //enable the reading pipes
-}
- /*--------------------------------------------------------*/
- 
- void openWritingPipe(uint64_t address)
- {
-  //open writing pipe
-  uint8_t temp[5];
-  for(int i = 0; i < 5; i++) temp[i] = 0xF & (address >> (i * 8));
-  writeRegister(RF24_RX_ADDR_P0, temp, 5);
-  writeRegister(RF24_TX_ADDR, temp, 5);
-  
-  writeRegister(RF24_RX_PW_P0, 32);
-  //writeRegister(RF24_TX_ADDR, reinterpret_cast<uint8_t*>(commonAddress), 5);
- }
- 
-/*--------------------------------------------------------*/
-
-void setChannel(uint8_t newChannel)
-{
-  //make sure we don't write outside of the channel spectrum
-  writeRegister(RF24_RF_CH, min(newChannel, 127));
+  digitalWrite(RFcsnPin, LOW);
+  uint8_t status = SPI.transfer(command);
+  digitalWrite(RFcsnPin, HIGH);
+  return status;
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-//read the register and the status
-uint8_t readRegister(uint8_t reg, uint8_t * buffer, uint8_t length)
+uint8_t RFspiRead(uint8_t command)
 {
-  uint8_t recievedStatus;
-  
-  csn(LOW); //disable chip activities
-  
-  recievedStatus = SPI.transfer(RF24_R_REGISTER | (RF24_REGISTER_MASK & reg)); //recieve status and request register
-  while(length--) *buffer = SPI.transfer(0xFF); //recieve register
-  
-  csn(HIGH); //re-enable chip
-  
-  return recievedStatus;
+    digitalWrite(RFcsnPin, LOW);
+    SPI.transfer(command); // Send the address, discard status
+    uint8_t val = SPI.transfer(0); // The MOSI value is ignored, value is read
+    digitalWrite(RFcsnPin, HIGH);
+    return val;
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-//read a single register, disregard the status
-uint8_t readRegister(uint8_t reg)
+uint8_t RFspiWrite(uint8_t command, uint8_t val)
 {
-  uint8_t out;
-  
-  csn(LOW); //disable chip activities
-  
-  SPI.transfer(RF24_R_REGISTER | (RF24_REGISTER_MASK & reg)); //request register
-  out = SPI.transfer(0xFF); //recieve register
-  
-  csn(HIGH); //re-enable chip
-  
-  return out;
+    digitalWrite(RFcsnPin, LOW);
+    uint8_t status = SPI.transfer(command);
+    SPI.transfer(val); // New register value follows
+    digitalWrite(RFcsnPin, HIGH);
+    return status;
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-//write buffer to a register, returns status
-uint8_t writeRegister(uint8_t reg, uint8_t * buffer, uint8_t length)
+void RFspiBurstRead(uint8_t command, uint8_t* dest, uint8_t len)
 {
-  uint8_t statusOut;
-  
-  csn(LOW);
-  statusOut = SPI.transfer(RF24_W_REGISTER | (RF24_REGISTER_MASK | reg));
-  Serial.println("Start SPI: " + String(RF24_W_REGISTER | (RF24_REGISTER_MASK | reg), HEX));
-  while(length--) //for the length of the buffer
-  {
-    Serial.println(*buffer, HEX);
-    SPI.transfer(*buffer++); //write the pointed @ value and increment
-  }
-  csn(HIGH);
-  
-  return statusOut;
+    digitalWrite(RFcsnPin, LOW);
+    SPI.transfer(command); // Send the start address, discard status
+    while (len--)
+	*dest++ = SPI.transfer(0); // The MOSI value is ignored, value is read
+    digitalWrite(RFcsnPin, HIGH);
+    // 300 microsecs for 32 octet payload
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-//write a single value to reg, return the status
-uint8_t writeRegister(uint8_t reg, uint8_t value)
+uint8_t RFspiBurstWrite(uint8_t command, uint8_t* src, uint8_t len)
 {
-  uint8_t statusOut;
-  
-  csn(LOW);
-  statusOut = SPI.transfer(RF24_W_REGISTER | (RF24_REGISTER_MASK | reg));
-  SPI.transfer(value); //trasfer the value
-  csn(HIGH);
-  
-  return statusOut;
+    digitalWrite(RFcsnPin, LOW);
+    uint8_t status = SPI.transfer(command);
+    while (len--)
+	SPI.transfer(*src++);
+    digitalWrite(RFcsnPin, HIGH);
+    return status;
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-//return status
-int getStatus()
+uint8_t RFspiReadRegister(uint8_t reg)
 {
-  int statusOut;
-  
-  csn(LOW);
-  statusOut = SPI.transfer(RF24_NOP);
-  csn(HIGH);
-  
-  return statusOut;
+    return RFspiRead((reg & NRF24_REGISTER_MASK) | NRF24_COMMAND_R_REGISTER);
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-uint8_t flushRX()
+uint8_t RFspiWriteRegister(uint8_t reg, uint8_t val)
 {
-  uint8_t statusOut;
-  
-  csn(LOW);
-  statusOut = SPI.transfer(RF24_FLUSH_RX);
-  csn(HIGH);
-  
-  return statusOut;
+    return RFspiWrite((reg & NRF24_REGISTER_MASK) | NRF24_COMMAND_W_REGISTER, val);
 }
 
-uint8_t flushTX()
+/**************************************************************************/
+
+void RFspiBurstReadRegister(uint8_t reg, uint8_t* dest, uint8_t len)
 {
-  uint8_t statusOut;
-  
-  csn(LOW);
-  statusOut = SPI.transfer(RF24_FLUSH_TX);
-  csn(HIGH);
-  
-  return statusOut;
+    return RFspiBurstRead((reg & NRF24_REGISTER_MASK) | NRF24_COMMAND_R_REGISTER, dest, len);
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-void startListening()
+uint8_t RFspiBurstWriteRegister(uint8_t reg, uint8_t* src, uint8_t len)
 {
-  //power up, set as PRX
-  uint8_t currentConfig = readRegister(RF24_CONFIG);
-  currentConfig |= (1 << RF24_PWR_UP) | (1 << RF24_PRIM_RX);
-  writeRegister(RF24_CONFIG, currentConfig);
-  
-  //clear interrupt flags
-  writeRegister(RF24_STATUS, (1 << RF24_RX_DR) | (1 << RF24_TX_DS) | (1 << RF24_MAX_RT));
-  
-  //flush buffers
-  flushRX();
-  flushTX();
-  
-  //activate radio
-  ce(HIGH);
-  
-  //wait for RX settle
-  delayMicroseconds(130);
+    return RFspiBurstWrite((reg & NRF24_REGISTER_MASK) | NRF24_COMMAND_W_REGISTER, src, len);
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-void stopListening()
+uint8_t RFstatusRead()
 {
-  ce(LOW);
-  flushRX();
-  flushTX();
+    return RFspiReadRegister(NRF24_REG_07_STATUS);
 }
 
-/*--------------------------------------------------------*/
+/****************************FLUSH COMMANDS********************************/
 
-uint8_t sendTransmission(const void *buffer, uint8_t length)
+uint8_t RFflushTX()
 {
-  uint8_t statusOut;
-  
-  //switch to transmitter
-  uint8_t currentConfig = readRegister(RF24_CONFIG);
-  currentConfig |= (1 << RF24_PWR_UP);
-  currentConfig &= ~(1 << RF24_PRIM_RX);
-  writeRegister(RF24_CONFIG, currentConfig);
-  
-  //TX settle
-  delayMicroseconds(150);
-  
-  //write payload
-  const uint8_t *payload = reinterpret_cast<const uint8_t*>(buffer);
-  uint8_t blank_amount = 32 - length;
-  csn(LOW);
-  statusOut = SPI.transfer(RF24_W_TX_PAYLOAD); //write payload command
-  while(length--) SPI.transfer(*payload++); //transfer payload
-  while(blank_amount--) SPI.transfer(0);
-  csn(HIGH);
-  
-  //activate radio, send message
-  ce(HIGH);
-  delayMicroseconds(15);
-  ce(LOW);
-  
-  return statusOut;
+    return RFspiCommand(NRF24_COMMAND_FLUSH_TX);
 }
 
-/*--------------------------------------------------------*/
-
-boolean RFAvailable()
+uint8_t RFflushRX()
 {
-  uint8_t currentStatus = getStatus();
-  
-  boolean result = currentStatus & (1 << RF24_RX_DR); //is anything recieved
-  
-  writeRegister(RF24_STATUS, 1 << RF24_RX_DR); //clear the flag
-  
-  return result;
+    return RFspiCommand(NRF24_COMMAND_FLUSH_RX);
 }
 
-/*--------------------------------------------------------*/
+/**************************************************************************/
 
-bool RFwrite( const void* buf, uint8_t len )
+boolean RFsetChannel(uint8_t channel)
 {
-  bool result = false;
+    RFspiWriteRegister(NRF24_REG_05_RF_CH, channel & NRF24_RF_CH);
+    return true;
+}
+boolean RFsetConfiguration(uint8_t configuration)
+{
+    RFcurrentConfiguration = configuration;
+}
 
-  // Begin the write
-  startTransmission(buf, len);
+/**************************************************************************/
 
-  // ------------
-  // At this point we could return from a non-blocking write, and then call
-  // the rest after an interrupt
+boolean RFsetPipeAddress(uint8_t pipe, uint8_t* address, uint8_t len)
+{
+  RFspiBurstWriteRegister(NRF24_REG_0A_RX_ADDR_P0 + pipe, address, len);
+  return true;
+}
 
-  // Instead, we are going to block here until we get TX_DS (transmission completed and ack'd)
-  // or MAX_RT (maximum retries, transmission failed).  Also, we'll timeout in case the radio
-  // is flaky and we get neither.
+/**************************************************************************/
 
-  // IN the end, the send should be blocking.  It comes back in 60ms worst case, or much faster
-  // if I tighted up the retry logic.  (Default settings will be 1500us.
-  // Monitor the send
-  uint8_t observe_tx;
-  uint8_t status;
-  uint32_t sent_at = millis();
-  const uint32_t timeout = 500; //ms to wait for timeout
-  do
-  {
-    status = readRegister(RF24_OBSERVE_TX, &observe_tx, 1);
-  }
-  while( ! ( status & ( (1 << TX_DS) | (1 << MAX_RT) ) ) && ( millis() - sent_at < timeout ) );
+boolean RFsetRetry(uint8_t delay, uint8_t count)
+{
+  //delay is calculated as: 250 + 250 * delay [µs]
+  RFspiWriteRegister(NRF24_REG_04_SETUP_RETR, ((delay << 4) & NRF24_ARD) | (count & NRF24_ARC));
+  return true;
+}
 
-  // The part above is what you could recreate with your own interrupt handler,
-  // and then call this when you got an interrupt
-  // ------------
+/**************************************************************************/
 
-  // Call this when you get an interrupt
-  // The status tells us three things
-  // * The send was successful (TX_DS)
-  // * The send failed, too many retries (MAX_RT)
-  // * There is an ack packet waiting (RX_DR)
-  bool tx_ok, tx_fail;
-  whatHappened(tx_ok,tx_fail,ack_payload_available);
-  
-  //printf("%u%u%u\r\n",tx_ok,tx_fail,ack_payload_available);
+boolean RFsetThisAddress(uint8_t* address, uint8_t len)
+{
+    // Set pipe 1 for this address
+    RFsetPipeAddress(1, address, len); 
+    // RX_ADDR_P2 is set to RX_ADDR_P1 with the LSbyte set to 0xff, for use as a broadcast address
+    return true;
+}
 
-  result = tx_ok;
-  IF_SERIAL_DEBUG(Serial.print(result?"...OK.":"...Failed"));
+/**************************************************************************/
 
-  // Handle the ack packet
-  if ( ack_payload_available )
-  {
-    ack_payload_length = getDynamicPayloadSize();
-    IF_SERIAL_DEBUG(Serial.print("[AckPacket]/"));
-    IF_SERIAL_DEBUG(Serial.println(ack_payload_length,DEC));
-  }
+boolean RFsetTransmitAddress(uint8_t* address, uint8_t len)
+{
+    // Set both TX_ADDR and RX_ADDR_P0 for auto-ack with Enhanced shockburst
+    RFspiBurstWriteRegister(NRF24_REG_0A_RX_ADDR_P0, address, len);
+    RFspiBurstWriteRegister(NRF24_REG_10_TX_ADDR, address, len);
+    return true;
+}
 
-  // Yay, we are done.
+/**************************************************************************/
 
-  // Power down
-  powerDown();
+boolean RFsetPayloadSize(uint8_t size)
+{
+    RFspiWriteRegister(NRF24_REG_11_RX_PW_P0, size);
+    RFspiWriteRegister(NRF24_REG_12_RX_PW_P1, size);
+    return true;
+}
 
-  // Flush buffers (Is this a relic of past experimentation, and not needed anymore??)
-  flush_tx();
+/**************************************************************************/
 
-  return result;
-}*/
+boolean RFsetRF(uint8_t data_rate, uint8_t power)
+{
+    uint8_t value = (power << 1) & NRF24_PWR;
+    // Ugly mapping of data rates to noncontiguous 2 bits:
+    if (data_rate == NRF24DataRate250kbps)
+	value |= NRF24_RF_DR_LOW;
+    else if (data_rate == NRF24DataRate2Mbps)
+	value |= NRF24_RF_DR_HIGH;
+    // else NRF24DataRate1Mbps, 00
+    RFspiWriteRegister(NRF24_REG_06_RF_SETUP, value);
+    return true;
+}
+
+/**************************************************************************/
+
+boolean RFpowerDown()
+{
+    RFspiWriteRegister(NRF24_REG_00_CONFIG, RFcurrentConfiguration);
+    digitalWrite(RFcePin, LOW);
+    return true;
+}
+
+/**************************************************************************/
+
+boolean RFpowerUpRX()
+{
+    boolean status = RFspiWriteRegister(NRF24_REG_00_CONFIG, RFcurrentConfiguration | NRF24_PWR_UP | NRF24_PRIM_RX);
+    digitalWrite(RFcePin, HIGH);
+    delayMicroseconds(150);
+    return status;
+}
+
+/**************************************************************************/
+
+boolean RFpowerUpTx()
+{
+    // Its the pulse high that puts us into TX mode
+    digitalWrite(RFcePin, LOW);
+    boolean status = RFspiWriteRegister(NRF24_REG_00_CONFIG, RFcurrentConfiguration | NRF24_PWR_UP);
+    digitalWrite(RFcePin, HIGH);
+    return status;
+}
+
+/**************************************************************************/
+
+boolean RFsend(uint8_t* data, uint8_t len, boolean noack)
+{
+    RFpowerUpTx();
+    RFspiBurstWrite(noack ? NRF24_COMMAND_W_TX_PAYLOAD_NOACK : NRF24_COMMAND_W_TX_PAYLOAD, data, len);
+    // Radio will return to Standby II mode after transmission is complete
+    return true;
+}
+
+/**************************************************************************/
+
+boolean RFwaitPacketSent()
+{
+    // If we are currently in receive mode, then there is no packet to wait for
+    if (RFspiReadRegister(NRF24_REG_00_CONFIG) & NRF24_PRIM_RX) return false;
+
+    // Wait for either the Data Sent or Max ReTries flag, signalling the 
+    // end of transmission
+    uint8_t status;
+    while (!((status = RFstatusRead()) & (NRF24_TX_DS | NRF24_MAX_RT)))
+	;
+
+    // Must clear NRF24_MAX_RT if it is set, else no further comm
+    RFspiWriteRegister(NRF24_REG_07_STATUS, NRF24_TX_DS | NRF24_MAX_RT);
+    if (status & NRF24_MAX_RT)
+	RFflushTX();
+    // Return true if data sent, false if MAX_RT
+    //Serial.println(String(status, BIN) + " & " + String(NRF24_TX_DS, BIN));
+    return status & NRF24_TX_DS;
+}
+
+/**************************************************************************/
+
+boolean RFisSending()
+{
+    return !(RFspiReadRegister(NRF24_REG_00_CONFIG) & NRF24_PRIM_RX) && !(RFstatusRead() & (NRF24_TX_DS | NRF24_MAX_RT));
+}
+
+/**************************************************************************/
+
+boolean RFprintRegisters()
+{
+    uint8_t registers[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0d, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x1c, 0x1d};
+
+    uint8_t i;
+    for (i = 0; i < sizeof(registers); i++)
+    {
+	Serial.print(i, HEX);
+	Serial.print(": ");
+	Serial.println(RFspiReadRegister(i), HEX);
+    }
+    return true;
+}
+
+/**************************************************************************/
+
+boolean RFavailable()
+{
+    if (RFspiReadRegister(NRF24_REG_17_FIFO_STATUS) & NRF24_RX_EMPTY)
+	return false;
+    // Manual says that messages > 32 octets should be discarded
+    if (RFspiRead(NRF24_COMMAND_R_RX_PL_WID) > 32)
+    {
+	RFflushRX();
+	return false;
+    }
+    return true;
+}
+
+/**************************************************************************/
+
+void RFwaitAvailable()
+{
+    RFpowerUpRX();
+    while (!RFavailable())
+	;
+}
+
+/**************************************************************************/
+
+// Blocks until a valid message is received or timeout expires
+// Return true if there is a message available
+// Works correctly even on millis() rollover
+bool RFwaitAvailableTimeout(uint16_t timeout)
+{
+    RFpowerUpRX();
+    unsigned long starttime = millis();
+    while ((millis() - starttime) < timeout)
+        if (RFavailable())
+           return true;
+    return false;
+}
+
+/**************************************************************************/
+
+boolean RFrecv(uint8_t* buf, uint8_t* len)
+{
+    // Clear read interrupt
+    RFspiWriteRegister(NRF24_REG_07_STATUS, NRF24_RX_DR);
+
+    // 0 microsecs @ 8MHz SPI clock
+    if (!RFavailable())
+	return false;
+    // 32 microsecs (if immediately available)
+    *len = RFspiRead(NRF24_COMMAND_R_RX_PL_WID);
+    // 44 microsecs
+    RFspiBurstRead(NRF24_COMMAND_R_RX_PAYLOAD, buf, *len);
+    // 140 microsecs (32 octet payload)
+
+    return true;
+}
