@@ -1,13 +1,52 @@
 #include <SPI.h>
 
-const uint8_t RFcePin = 9, RFcsnPin = 10;
-<<<<<<< HEAD
-=======
+const uint8_t RFcePin = 14, RFcsnPin = 10;
 uint8_t RFcurrentConfiguration = NRF24_EN_CRC | NRF24_CRCO;
 
->>>>>>> origin/RF-devlopment
 const uint64_t commonAddress = 0xF0F0F0F042LL; //this address is common for all devices
 
+/**************************************************************************/
+/*
+#define RFMOSI 
+#define RFMISO
+#define RFSCK
+
+//SPI MODE0
+uint8_t SPItransfer(uint8_t byte_out)
+{
+    uint8_t byte_in;
+    uint8_t bit;
+ 
+    for (bit = 0; bit < 8; bit++) {
+ 
+        // Shift-out a bit to the MOSI line. 
+        if (byte_out & 0x80)
+            digitalWrite(RFMOSI, HIGH);
+        else
+            digitalWrite(RFMOSI, LOW);
+        byte_out <<= 1;
+ 
+        // Delay for at least the peer's setup time. 
+        delayMicroseconds(1);
+ 
+        // Pull the clock line high. 
+        digitalWrite(RFSCK, HIGH);
+ 
+        // Shift-in a bit from the MISO line.
+        byte_in <<= 1;
+        if (digitalRead(RFMISO) == HIGH)
+            byte_in |= 1;
+ 
+        // Delay for at least the peer's hold time.
+        delayMicroseconds(1);
+ 
+        //Pull the clock line low.
+        digitalWrite(RFSCK, LOW);
+    }
+ 
+    return byte_in;
+}
+*/
 
 /**************************************************************************/
 
@@ -36,21 +75,11 @@ boolean RFinit()
   
   RFpowerDown();
   
-  RFflushTX();
-  RFflushRX();
-  
-<<<<<<< HEAD
-  
-  //open the reading pipes
-  writeRegister(RF24_RX_ADDR_P0, reinterpret_cast<uint8_t*>(commonAddress), 5); //write common address to RX pipe 0
-  //writeRegister(RF24_RX_ADDR_P1, reinterpret_cast<uint8_t*>(0xF042CC1337LL), 5); //write own addres to RX pipe 1
-  
   //flush all
-  flushRX();
-  flushTX();
-=======
+  RFflushRX();
+  RFflushTX();
+  
   return RFpowerUpRX();
->>>>>>> origin/RF-devlopment
 }
 
 /**************************************************************************/

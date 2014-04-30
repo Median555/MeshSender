@@ -50,14 +50,13 @@ void setup()
     RFspiWriteRegister(NRF24_REG_1D_FEATURE, NRF24_EN_DYN_ACK);
   }
   
-<<<<<<< HEAD
   /*
   LCDInit();
   
   DrawClear(vram);
   DrawString(vram, "Hej verden!", 10, 10);
   LCDUpdate(vram);*/
-=======
+  
   if (role == RFReciever)
   {
     RFpowerUpRX();
@@ -65,7 +64,6 @@ void setup()
   
   delay(100);
   Serial.println("RF init succes!");
->>>>>>> origin/RF-devlopment
 }
 
 int count = 0;
