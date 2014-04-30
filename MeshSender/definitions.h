@@ -1,9 +1,9 @@
-#define LCD_RST 12
-#define LCD_SCE 11
-#define LCD_DC 10
-#define LCD_DN 9
-#define LCD_SCLK 8
-#define LCD_BACKLIGHT 6
+#define LCD_RST 8
+#define LCD_SCE 9
+#define LCD_DC 7
+#define LCD_DN 6
+#define LCD_SCLK 5
+#define LCD_BACKLIGHT 4
 #define DELAY 50
 #define LCD_WIDTH 84
 #define LCD_HEIGHT 48

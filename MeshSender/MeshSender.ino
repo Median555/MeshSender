@@ -1,6 +1,6 @@
 
 #include "definitions.h"
-
+#include <Time.h>
 
 int Yakse = 0;
 int Xakse = 0;
@@ -12,9 +12,9 @@ int pointerY;
 
 void setup() 
 {
- /* RFbegin();
+  //RFbegin();
   Serial.begin(9600);
-  while (!Serial) {;}
+  /*while (!Serial) {;}
   Serial.println(String(getStatus(), BIN)); 
   */
   setSyncProvider(getTeensy3Time);
@@ -30,7 +30,7 @@ void setup()
 
 void loop() 
 {
-  if (Serial.available()) 
+  /*if (Serial.available()) 
   {
     time_t t = processSyncMessage();
     if (t != 0) 
@@ -38,7 +38,7 @@ void loop()
       Teensy3Clock.set(t); // set the RTC
       setTime(t);
     }
-  }
+  }*/
   digitalClockDisplay();  
   delay(1000);
 
