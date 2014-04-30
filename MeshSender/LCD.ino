@@ -13,12 +13,12 @@ void LCDInit()
   digitalWrite(LCD_RST, LOW);
   digitalWrite(LCD_RST, HIGH);
   
-  LCDWriteCmd(0x21); //H = 1, skifter kommando-set til 1
-  LCDWriteCmd(0xA8); //sætter kontrast
-  LCDWriteCmd(0x04); //sætter temperatur koefficient til 0 (don't touch)
-  LCDWriteCmd(0x14); //sætter Bias voltage til 1:40, kan ændres
-  LCDWriteCmd(0x20); //H = 0, skifter kommandoset til 0
-  LCDWriteCmd(0x0C); //Display control, tænder alle segmenter
+  LCDWriteCmd(0x21); //Sets the function to H = 1
+  LCDWriteCmd(0xA8); //Sets the Contrast
+  LCDWriteCmd(0x04); //Temepratur control
+  LCDWriteCmd(0x14); //Bias = 1:40
+  LCDWriteCmd(0x20); //Sets the function to H = 0
+  LCDWriteCmd(0x0C); //Display control turn on all segments 
   
   LCDClear();
   
@@ -35,7 +35,7 @@ void LCDWriteData(byte dat)
 }
 
 //write cmd to the display
-void LCDWriteCmd(byte cmd) //Den funktion vi bruge når vi skal skrive commands til vores skærm
+void LCDWriteCmd(byte cmd) //The function to use to send commands to the display
 {
  digitalWrite(LCD_DC,LOW); //DC pin set LOW to send commands
  digitalWrite(LCD_SCE, LOW);
